@@ -3,16 +3,13 @@ import requests
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 
-API_URL = "https://imdb.iamidiotareyoutoo.com/?q="
-
-BOT_TOKEN = os.getenv("BOT_TOKEN")  # أو ضع التوكن مباشرة هنا
-
+OMDB_API_KEY = "5c5df644"  # ضع مفتاحك هنا
+BOT_TOKEN = os.getenv("BOT_TOKEN") or "ضع_توكن_البوت_هنا"
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "🎬 أرسل اسم أي فيلم أو مسلسل باللغة الإنجليزية وسأجلب لك المعلومات عنه."
+        "🎬 أرسل اسم فيلم أو مسلسل باللغة الإنجليزية، وسأبحث لك عنه."
     )
-
 
 async def search_movie(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.message.text.strip()
@@ -20,44 +17,49 @@ async def search_movie(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❗ يرجى كتابة اسم الفيلم أو المسلسل.")
         return
 
-    url_api = API_URL + query
-    response = requests.get(url_api)
-    
-    print("Response text:", response.text)  # طباعة نص الرد في الكونسول
-
+    url = f"http://www.omdbapi.com/?apikey={OMDB_API_KEY}&t={query}"
+    response = requests.get(url)
     if response.status_code != 200:
-        await update.message.reply_text("⚠️ حدث خطأ أثناء الاتصال بالمخدم.")
+        await update.message.reply_text("⚠️ حدث خطأ في الاتصال بالمخدم.")
         return
 
-    try:
-        data = response.json()
+    data = response.json()
+    if data.get("Response") == "False":
+        await update.message.reply_text(f"🙁 لم أجد نتائج لـ '{query}'.")
+        return
 
-        # تحقق من وجود نتائج
-        if "description" not in data or not data["description"]:
-            await update.message.reply_text("🙁 لم أجد نتائج للفيلم.")
-            return
+    title = data.get("Title", "لا يوجد عنوان")
+    year = data.get("Year", "؟")
+    rated = data.get("Rated", "؟")
+    released = data.get("Released", "؟")
+    runtime = data.get("Runtime", "؟")
+    genre = data.get("Genre", "؟")
+    director = data.get("Director", "؟")
+    actors = data.get("Actors", "؟")
+    plot = data.get("Plot", "لا يوجد ملخص")
+    rating = data.get("imdbRating", "؟")
+    poster = data.get("Poster", None)
+    imdb_id = data.get("imdbID", "")
 
-        movie = data["description"][0]
-        title = movie.get("title", "بدون عنوان")
-        image = movie.get("image", "")
-        rating = movie.get("rating", "؟")
-        url_imdb = movie.get("url", "")
+    caption = f"*{title}* ({year})\n"
+    caption += f"⭐ تقييم IMDb: {rating}\n"
+    caption += f"🎬 النوع: {genre}\n"
+    caption += f"🕒 المدة: {runtime}\n"
+    caption += f"👨‍🎨 المخرج: {director}\n"
+    caption += f"🎭 الممثلون: {actors}\n\n"
+    caption += f"📖 القصة:\n{plot}\n"
+    caption += f"\n[رابط IMDb](https://www.imdb.com/title/{imdb_id}/)"
 
-        caption = f"*{title}*\n⭐ التقييم: {rating}\n"
+    keyboard = [
+        [InlineKeyboardButton("🔗 رابط IMDb", url=f"https://www.imdb.com/title/{imdb_id}/")],
+        [InlineKeyboardButton("⬇️ تحميل الفيلم", callback_data=f"download_{imdb_id}")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
 
-        keyboard = [
-            [InlineKeyboardButton("🔗 رابط IMDb", url=url_imdb)],
-            [InlineKeyboardButton("⬇️ تحميل الفيلم", callback_data=f"download_{title}")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-
-        await update.message.reply_photo(
-            photo=image, caption=caption, parse_mode="Markdown", reply_markup=reply_markup
-        )
-    except Exception as e:
-        print("Error parsing data:", e)
-        await update.message.reply_text("⚠️ حدث خطأ أثناء معالجة البيانات.")
-
+    if poster and poster != "N/A":
+        await update.message.reply_photo(photo=poster, caption=caption, parse_mode="Markdown", reply_markup=reply_markup)
+    else:
+        await update.message.reply_text(caption, parse_mode="Markdown", reply_markup=reply_markup)
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -65,14 +67,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     data = query.data
     if data.startswith("download_"):
-        movie_title = data[len("download_"):]
-        await query.message.reply_text(f"🔽 رابط تحميل {movie_title} سيتم إضافته لاحقاً.")
-
+        imdb_id = data[len("download_"):]
+        # هنا تضيف منطق تحميل الفيلم أو رابط تحميل حقيقي إذا توفر
+        await query.message.reply_text(f"🔽 رابط تحميل الفيلم {imdb_id} سيضاف لاحقًا.")
 
 def main():
-    token = BOT_TOKEN or "ضع_توكن_البوت_هنا"
-
-    app = Application.builder().token(token).build()
+    app = Application.builder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, search_movie))
@@ -80,7 +80,6 @@ def main():
 
     print("✅ Bot is running...")
     app.run_polling()
-
 
 if __name__ == "__main__":
     main()
