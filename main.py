@@ -22,18 +22,22 @@ async def search_movie(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     url_api = API_URL + query
     response = requests.get(url_api)
+    
+    print("Response text:", response.text)  # طباعة نص الرد في الكونسول
 
     if response.status_code != 200:
         await update.message.reply_text("⚠️ حدث خطأ أثناء الاتصال بالمخدم.")
         return
 
     try:
-        results = response.json().get("description", [])
-        if not results:
-            await update.message.reply_text("🙁 لم أجد نتائج.")
+        data = response.json()
+
+        # تحقق من وجود نتائج
+        if "description" not in data or not data["description"]:
+            await update.message.reply_text("🙁 لم أجد نتائج للفيلم.")
             return
 
-        movie = results[0]
+        movie = data["description"][0]
         title = movie.get("title", "بدون عنوان")
         image = movie.get("image", "")
         rating = movie.get("rating", "؟")
@@ -51,7 +55,7 @@ async def search_movie(update: Update, context: ContextTypes.DEFAULT_TYPE):
             photo=image, caption=caption, parse_mode="Markdown", reply_markup=reply_markup
         )
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print("Error parsing data:", e)
         await update.message.reply_text("⚠️ حدث خطأ أثناء معالجة البيانات.")
 
 
@@ -62,7 +66,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
     if data.startswith("download_"):
         movie_title = data[len("download_"):]
-        # هنا تضيف رابط التحميل أو أي وظيفة تريدها
         await query.message.reply_text(f"🔽 رابط تحميل {movie_title} سيتم إضافته لاحقاً.")
 
 
