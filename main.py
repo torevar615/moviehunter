@@ -1,74 +1,67 @@
-import logging
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
-import aiohttp
+import requests
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
-# ضع هنا توكن بوت تيليجرام
 BOT_TOKEN = "7644193561:AAEH_CsjSZoyiG3bMLmHDZsnLkUKbg6Wk1k"
-
-# توكن TMDB API (مفتاح القراءة)
-TMDB_API_TOKEN = "fcbe1d791fe9eafa50c3107c011ff73a"
-
-# إعدادات اللوق
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
-
-logger = logging.getLogger(__name__)
+OMDB_API_KEY = "b0465c6f"
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("مرحبًا! أرسل لي /movie ثم اسم الفيلم للحصول على معلومات.")
+    await update.message.reply_text("مرحباً! أرسل اسم فيلم للبحث عنه.")
 
-async def get_movie_info(title: str):
-    url = f"https://api.themoviedb.org/3/search/movie?fcbe1d791fe9eafa50c3107c011ff73a=YOUR_API_KEY&query="
-    headers = {
-        "Authorization": f"Bearer {TMDB_API_TOKEN}",
-        "Content-Type": "application/json;charset=utf-8"
-    }
-    params = {"query": title}
-
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url, headers=headers, params=params) as resp:
-            if resp.status != 200:
-                return None
-            data = await resp.json()
-            if data["results"]:
-                movie = data["results"][0]
-                return movie
-            else:
-                return None
-
-async def movie_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if len(context.args) == 0:
-        await update.message.reply_text("يرجى إرسال اسم الفيلم بعد الأمر /movie")
+async def search_movie(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.message.text.strip()
+    url = f"http://www.omdbapi.com/?apikey={OMDB_API_KEY}&t={query}"
+    
+    response = requests.get(url)
+    
+    if response.status_code != 200:
+        await update.message.reply_text("⚠️ حدث خطأ في الاتصال بالمخدم.")
         return
-
-    movie_name = " ".join(context.args)
-    await update.message.reply_text(f"جاري البحث عن: {movie_name} ...")
-
-    movie = await get_movie_info(movie_name)
-    if movie:
-        title = movie.get("title", "غير معروف")
-        overview = movie.get("overview", "لا يوجد وصف")
-        release_date = movie.get("release_date", "غير معروف")
-        vote_average = movie.get("vote_average", "N/A")
-        reply = (
-            f"🎬 *{title}*\n"
-            f"📅 تاريخ الإصدار: {release_date}\n"
-            f"⭐ تقييم: {vote_average}\n"
-            f"📖 نبذة:\n{overview}"
-        )
-        await update.message.reply_markdown(reply)
+    
+    data = response.json()
+    
+    if data.get("Response") == "False":
+        await update.message.reply_text(f"لم يتم العثور على فيلم باسم: {query}")
+        return
+    
+    title = data.get("Title", "غير معروف")
+    year = data.get("Year", "غير معروف")
+    rated = data.get("Rated", "غير معروف")
+    released = data.get("Released", "غير معروف")
+    runtime = data.get("Runtime", "غير معروف")
+    genre = data.get("Genre", "غير معروف")
+    director = data.get("Director", "غير معروف")
+    plot = data.get("Plot", "غير متوفر")
+    imdb_rating = data.get("imdbRating", "غير معروف")
+    poster = data.get("Poster")
+    imdb_id = data.get("imdbID")
+    
+    msg = (f"🎬 *{title}* ({year})\n"
+           f"⭐ تقييم IMDb: {imdb_rating}\n"
+           f"📅 إصدار: {released}\n"
+           f"⏳ المدة: {runtime}\n"
+           f"🎭 النوع: {genre}\n"
+           f"🎬 المخرج: {director}\n\n"
+           f"📖 القصة:\n{plot}")
+    
+    buttons = []
+    if imdb_id:
+        imdb_url = f"https://www.imdb.com/title/{imdb_id}/"
+        buttons.append([InlineKeyboardButton("مشاهدة على IMDb", url=imdb_url)])
+        # هنا يمكنك إضافة زر تحميل إذا كان لديك رابط تحميل حقيقي
+        # buttons.append([InlineKeyboardButton("تحميل الفيلم", url="رابط_التحميل")])
+    
+    keyboard = InlineKeyboardMarkup(buttons) if buttons else None
+    
+    if poster and poster != "N/A":
+        await update.message.reply_photo(photo=poster, caption=msg, parse_mode='Markdown', reply_markup=keyboard)
     else:
-        await update.message.reply_text("لم أتمكن من العثور على الفيلم المطلوب.")
+        await update.message.reply_text(msg, parse_mode='Markdown', reply_markup=keyboard)
 
 def main():
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
-
+    app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("movie", movie_command))
-
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, search_movie))
     app.run_polling()
 
 if __name__ == "__main__":
