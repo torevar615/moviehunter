@@ -21,7 +21,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("مرحبًا! أرسل لي /movie ثم اسم الفيلم للحصول على معلومات.")
 
 async def get_movie_info(title: str):
-    url = f"https://api.themoviedb.org/3/search/movie"
+    url = f"https://api.themoviedb.org/3/search/movie?fcbe1d791fe9eafa50c3107c011ff73a=YOUR_API_KEY&query="
     headers = {
         "Authorization": f"Bearer {TMDB_API_TOKEN}",
         "Content-Type": "application/json;charset=utf-8"
