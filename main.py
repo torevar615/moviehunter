@@ -4,7 +4,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 
 OMDB_API_KEY = "5c5df644"  # ضع مفتاحك هنا
-BOT_TOKEN = os.getenv("BOT_TOKEN") or "ضع_توكن_البوت_هنا"
+BOT_TOKEN = os.getenv("BOT_TOKEN") or "7644193561:AAEH_CsjSZoyiG3bMLmHDZsnLkUKbg6Wk1k"
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
