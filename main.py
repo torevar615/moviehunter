@@ -35,3 +35,23 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+async def search_movie(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.message.text.strip()
+    print(f"🔍 Searching for: {query}")  # تتبع البحث
+
+    res = requests.get(API_URL + query)
+    print(f"📡 API response: {res.status_code}")  # كود الاستجابة
+
+    try:
+        data = res.json()
+        print(f"📦 JSON data: {data}")  # عرض البيانات
+
+        if data.get("description"):
+            first = data["description"][0]
+            ...
+        else:
+            await update.message.reply_text("🙁 لم أجد نتائج.")
+    except Exception as e:
+        print(f"❌ JSON Error: {e}")
+        await update.message.reply_text("حدث خطأ أثناء جلب البيانات.")
